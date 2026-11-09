@@ -22,8 +22,11 @@ class MarketBridge(
 
     @JavascriptInterface
     fun save(json: String) {
-        prefs.edit().putString(KEY_STATE, json).apply()
+        prefs.edit().putString(KEY_STATE, json).putLong(KEY_VERSION, prefs.getLong(KEY_VERSION, 0) + 1).apply()
     }
+
+    /** Bumped on every save, so the wallpaper can tell whether the builder changed anything since it last loaded. */
+    fun version(): Long = prefs.getLong(KEY_VERSION, 0)
 
     /** Returns "" when nothing is saved yet (the page then builds the sample market). */
     @JavascriptInterface
@@ -45,5 +48,6 @@ class MarketBridge(
     companion object {
         const val PREFS = "market"
         const val KEY_STATE = "state"
+        const val KEY_VERSION = "version"
     }
 }

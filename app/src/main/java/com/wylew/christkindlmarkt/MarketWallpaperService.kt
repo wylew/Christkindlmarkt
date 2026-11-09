@@ -27,6 +27,9 @@ class MarketWallpaperService : WallpaperService() {
         private var display: VirtualDisplay? = null
         private var presentation: Presentation? = null
         private var web: WebView? = null
+        private var bridge: MarketBridge? = null
+        /** The saved-state version the page last loaded; -1 until the scene exists. */
+        private var loadedVersion = -1L
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
@@ -53,8 +56,11 @@ class MarketWallpaperService : WallpaperService() {
         private fun showScene() {
             val vd = display ?: return
             val p = Presentation(this@MarketWallpaperService, vd.display, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-            val bridge = MarketBridge(this@MarketWallpaperService, wallpaper = true)
-            val view = MarketWeb.create(p.context, bridge, wallpaper = true)
+            val b = MarketBridge(this@MarketWallpaperService, wallpaper = true)
+            // Read before the page boots: if a save lands in between, the page has the newer state and we reload once more, harmlessly.
+            loadedVersion = b.version()
+            val view = MarketWeb.create(p.context, b, wallpaper = true)
+            bridge = b
             p.setContentView(view)
             p.window?.apply {
                 setBackgroundDrawable(ColorDrawable(Color.BLACK))
@@ -70,8 +76,12 @@ class MarketWallpaperService : WallpaperService() {
             val view = web ?: return
             if (visible) {
                 view.onResume()
-                // Pick up anything changed in the builder since we were last shown.
-                view.evaluateJavascript("window.market&&(market.reload(),market.setPaused(false))", null)
+                // Reload only if the builder saved since we last loaded: reloading drops every sprite and sky cache,
+                // which made each unlock / return home a CPU spike.
+                val v = bridge?.version() ?: loadedVersion
+                val reload = v != loadedVersion
+                loadedVersion = v
+                view.evaluateJavascript(if (reload) "window.market&&(market.reload(),market.setPaused(false))" else "window.market&&market.setPaused(false)", null)
             } else {
                 view.evaluateJavascript("window.market&&market.setPaused(true)", null)
                 view.onPause()
@@ -100,6 +110,7 @@ class MarketWallpaperService : WallpaperService() {
                 it.destroy()
             }
             web = null
+            bridge = null
             presentation?.dismiss()
             presentation = null
             display?.release()

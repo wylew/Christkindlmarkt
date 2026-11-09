@@ -1154,6 +1154,10 @@ function drawSanta(c){
 }
 
 /* ---------- render ---------- */
+// Background layers redraw only when their whole-pixel offset or inputs change (the slow pan moves them every few
+// seconds); twinkling stars, aurora and mountain lights refresh at ~15 fps. resize() clears the canvases, so it resets LK.
+let LK={};const LAYER_ANIM_DT=1/15;
+function layerDue(name,key,anim){const l=LK[name];if(l&&l.key===key&&!(anim&&T-l.t>=LAYER_ANIM_DT))return false;LK[name]={key,t:T};return true;}
 function maxCam(){return Math.max(0,WORLD_W-W);}
 function clampCam(){camX=W>=WORLD_W?-(W-WORLD_W)/2:Math.max(0,Math.min(maxCam(),camX));}
 function render(){
@@ -1162,7 +1166,11 @@ function render(){
   for(const it of items){it._rx=it.x;const tx=plan&&plan.has(it.id)?plan.get(it.id):it.x;it._vx=it._vx==null?tx:it._vx+(tx-it._vx)*ease;if(Math.abs(tx-it._vx)<.2)it._vx=tx;it.x=Math.round(it._vx);}
   LIGHTS=[];FX=true;
   CX=Math.floor(camX);const om=Math.floor(camX*.2),of=Math.floor(camX*.5),cxr=CX;
-  const oa=Math.floor(camX*.1);drawSkyLayer(TP);drawRange(ctxFar,TP,oa,true);drawMtnLayer(TP,om);drawForLayer(TP,of);
+  const oa=Math.floor(camX*.1),lit=TP.k>.6;
+  if(layerDue('sky',TP.label+'|'+W+'x'+H+'|'+G,!!(TP.stars||TP.aurora)))drawSkyLayer(TP);
+  if(layerDue('far',rangeImg(TP,true).key+'|'+oa,false))drawRange(ctxFar,TP,oa,true);
+  if(layerDue('mtn',rangeImg(TP,false).key+'|'+om+'|'+lit,lit))drawMtnLayer(TP,om);
+  if(layerDue('for',[of,TP.forest,TP.forestS,cover,DW,H,G].join('|'),false))drawForLayer(TP,of);
   shift(cFar,camX*.1-oa);shift(cMtn,camX*.2-om);shift(cFor,camX*.5-of);shift(cv,camX-CX);
   const back=items.filter(i=>i.row==='back').sort((a,b)=>a.x-b.x),front=items.filter(i=>i.row!=='back').sort((a,b)=>a.x-b.x);
   const ppl=agents.slice().sort((a,b)=>agentY(a)-agentY(b));
@@ -1231,7 +1239,7 @@ function resize(){
   sizeLayer(cSky,W);sizeLayer(cFar,DW);sizeLayer(cMtn,DW);sizeLayer(cFor,DW);sizeLayer(cv,DW);
   for(const c of [worldC,emC,darkC]){c.width=DW;c.height=H;}
   cFx.width=Math.round(pw);cFx.height=Math.round(ph);cFx.style.width=st.width+'px';cFx.style.height=st.height+'px';
-  G=H-56;BY=H-52;WALK=H-37;FY=H-4;skyC=null;flakes=[];clampCam();
+  G=H-56;BY=H-52;WALK=H-37;FY=H-4;skyC=null;flakes=[];LK={};clampCam();
 }
 
 /* ---------- placement ---------- */
@@ -1454,7 +1462,7 @@ $('#bWall').onclick=()=>setMode('wall');
 $('#exitWall').onclick=()=>setMode('build');
 window.addEventListener('resize',resize);try{new ResizeObserver(()=>resize()).observe(stageEl);}catch(_){}
 window.setWallpaperOffset=f=>{wpOff=Math.max(0,Math.min(1,+f));};
-function reloadState(){load();cache.clear();palCache&&Object.keys(palCache).forEach(k=>delete palCache[k]);skyC=null;recomputeWorld();syncCrowd();syncTop();syncSpeed();if(!$('#tiles').className)buildTiles();}
+function reloadState(){load();cache.clear();palCache&&Object.keys(palCache).forEach(k=>delete palCache[k]);skyC=null;LK={};recomputeWorld();syncCrowd();syncTop();syncSpeed();if(!$('#tiles').className)buildTiles();}
 window.market={set:(k,v)=>{S[k]=v;syncTop();},setPaused:v=>{paused=!!v;},reload:reloadState,
   back:()=>{if(mode==='wall'&&!document.body.classList.contains('svc')){setMode('build');return true;}if(!$('#sheet').hidden){$('#sheet').hidden=true;return true;}if(selected){select(null);return true;}if(tool){tool=null;buildTiles();hint();return true;}return false;},santa:()=>{santaT=0;santa=null;},spawn:(k,x)=>{spawnAt(k,{sp:k==='carriage'?8:10});agents[agents.length-1].x=x;},get agents(){return agents;},get state(){return {S,items,camX};},setSpeed:v=>{S.speed=v;syncSpeed();},setTime:t=>{S.time=t;syncTop();},setSnow:s=>{S.snow=s;syncTop();},wallpaper:()=>setMode('wall'),build:()=>setMode('build')};
 
