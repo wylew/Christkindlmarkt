@@ -15,6 +15,7 @@ html,body{margin:0;height:100%;background:#05060f;color:var(--cream);font-family
 #stage{cursor:grab}
 .lay{position:absolute;left:0;bottom:0;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;will-change:transform;transform:translateZ(0)}
 #cFx{image-rendering:auto}
+.src{display:none}
 input[type=range]{accent-color:var(--gold);flex:1;min-width:90px}
 .spdl{font-size:12px;width:56px;text-align:right;color:#cbbfa3}
 #wallCtl{position:absolute;right:12px;top:max(12px,env(safe-area-inset-top));display:none;z-index:4;gap:8px;align-items:center;background:#16112bdd;border:2px solid var(--line);padding:6px 8px}
@@ -77,7 +78,7 @@ body.dragging .tile.drag{opacity:.45}
 <body>
 <div id="app">
   <div id="stage">
-    <canvas id="cSky" class="lay"></canvas><canvas id="cFar" class="lay"></canvas><canvas id="cMtn" class="lay"></canvas><canvas id="cFor" class="lay"></canvas><canvas id="cv" class="lay"></canvas><canvas id="cFx" class="lay"></canvas>
+    <canvas id="cSky" class="src"></canvas><canvas id="cFar" class="src"></canvas><canvas id="cMtn" class="src"></canvas><canvas id="cFor" class="src"></canvas><canvas id="cv" class="src"></canvas><canvas id="cFx" class="lay"></canvas>
     <div id="top">
       <div class="brand">Christkindlmarkt<small>build your winter market</small></div>
       <div class="tb">
@@ -1064,7 +1065,8 @@ function drawForLayer(TP,of){
     R(c,sx,G-ch-2,1,ch+4,ph<3?TP.forest:shade(TP.forest,.8));if(cover&&hash(idx*31+ph)<.55)P(c,sx,G-ch-2,TP.forestS);
   }
 }
-function shift(el,frac){el.style.transform=`translate3d(${-Math.round(frac*K)/DPR}px,0,0)`;}
+// Sub-pixel parallax: remember each layer's whole-device-pixel offset; drawSnow composites the layers with it.
+function shift(el,frac){el._sx=-Math.round(frac*K);}
 function drawGround(c){
   const x0=CX-2,x1=x0+DW+4;
   if(cover){
@@ -1100,7 +1102,11 @@ function updSnow(){
     if(f.y>H+2)Object.assign(f,newFlake(false));if(f.x<-3)f.x+=W+6;if(f.x>W+3)f.x-=W+6;}
 }
 function drawSnow(TP){
-  const c=ctxX;c.clearRect(0,0,cFx.width,cFx.height);drawSanta(c);if(!flakes.length)return;
+  const c=ctxX;c.clearRect(0,0,cFx.width,cFx.height);
+  // cFx is the only on-screen canvas: stacking six separately composited canvases made layers blink in WebView.
+  c.imageSmoothingEnabled=false;const ly=cFx.height-H*K;
+  for(const l of [cSky,cFar,cMtn,cFor,cv])c.drawImage(l,l._sx||0,ly,l.width*K,l.height*K);
+  drawSanta(c);if(!flakes.length)return;
   c.fillStyle=TP.tk==='golden'?'#fff6ee':'#eef2ff';const oy=cFx.height-H*K;
   for(const f of flakes){const big=f.z>.86,s=big?2*K:K;c.globalAlpha=big?.9:.3+.6*f.z;c.fillRect(Math.round(f.x*K),Math.round(oy+f.y*K),s,s);}
   c.globalAlpha=1;
