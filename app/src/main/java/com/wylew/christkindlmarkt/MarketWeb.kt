@@ -29,6 +29,9 @@ object MarketWeb {
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
             .build()
 
+        // Debug builds can be inspected and profiled from chrome://inspect.
+        if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
+
         return WebView(context).apply {
             setBackgroundColor(Color.BLACK)
             isVerticalScrollBarEnabled = false
